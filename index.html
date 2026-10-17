@@ -1,150 +1,57 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Free Flight Tracking Stack — Commercial Cloudflare Build</title>
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Instrument+Sans:wght@500;700&display=swap" rel="stylesheet">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FlyingTracker — Live Flight Radar 24/7</title>
+<link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <style>
-:root{--bg:#0a1220;--bg2:#101d35;--card:#111e36;--border:rgba(255,255,255,.08);--text:#e6eefc;--dim:#8fa0bf;--accent:#00d4ff;--accent2:#a78bfa}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:Instrument Sans,system-ui,sans-serif}
-.mono{font-family:JetBrains Mono,monospace}
-.wrap{max-width:1120px;margin:0 auto;padding:0 20px}
-.hero{padding:48px 0 24px;border-bottom:1px solid var(--border);background:radial-gradient(600px 300px at 30% 0%,rgba(0,212,255,.12),transparent),radial-gradient(500px 300px at 90% 0%,rgba(167,139,250,.10),transparent)}
-.badge{display:inline-flex;gap:8px;align-items:center;padding:6px 10px;border-radius:999px;background:rgba(0,212,255,.1);border:1px solid rgba(0,212,255,.25);color:var(--accent);font-size:11px;letter-spacing:.08em}
-h1{font-size:38px;line-height:1.05;letter-spacing:-.03em;margin:16px 0 10px}
-.grid{display:grid;gap:14px}
-.grid-3{grid-template-columns:repeat(3,1fr)}
-.grid-2{grid-template-columns:repeat(2,1fr)}
-@media(max-width:860px){.grid-3,.grid-2{grid-template-columns:1fr}h1{font-size:28px}}
-.card{background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.01));border:1px solid var(--border);border-radius:16px;padding:16px}
-.table{width:100%;border-collapse:collapse;font-size:13px}
-.table th{text-align:left;color:var(--dim);font-weight:500;padding:10px 12px;border-bottom:1px solid var(--border);font-family:JetBrains Mono}
-.table td{padding:12px;border-bottom:1px solid rgba(255,255,255,.05);vertical-align:top}
-.tag{display:inline-block;padding:2px 7px;border-radius:999px;border:1px solid var(--border);font-size:10px;color:var(--dim)}
-.code{background:#0b152a;border:1px solid var(--border);border-radius:12px;padding:14px;overflow:auto;font-size:13px;line-height:1.6;color:#c2d1e8}
-a{color:var(--accent);text-decoration:none}
-.btn{display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border-radius:10px;background:var(--accent);color:#001019;font-weight:700;border:0;cursor:pointer}
-.btn-ghost{background:rgba(255,255,255,.06);color:var(--text);border:1px solid var(--border)}
-.nav{position:sticky;top:0;z-index:20;backdrop-filter:blur(10px);background:rgba(10,18,32,.8);border-bottom:1px solid var(--border)}
-.nav .wrap{display:flex;align-items:center;justify-content:space-between;padding:10px 20px}
-.small{font-size:11px;color:var(--dim)}
-.kbd{font-family:JetBrains Mono;border:1px solid var(--border);padding:2px 6px;border-radius:6px;background:rgba(255,255,255,.05);font-size:11px}
+  :root{ --bg:#0b111e; --panel:#111a2e; --border:#1e2d50; --accent:#00d9ff; --accent2:#7c3aed; }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:var(--bg);color:#e2e8f0;font-family:ui-monospace,monospace;overflow:hidden}
+  #map{position:absolute;inset:0;top:56px;bottom:0}
+  header{height:56px;background:rgba(11,17,30,0.9);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 16px;position:relative;z-index:10}
+  .logo{display:flex;align-items:center;gap:10px;font-weight:800}
+  .logo-dot{width:10px;height:10px;background:#22c55e;border-radius:50%;box-shadow:0 0 12px #22c55e;animation:pulse 2s infinite}
+  @keyframes pulse{0%,100%{opacity:1} 50%{opacity:0.5}}
+  .badge{background:linear-gradient(90deg,var(--accent),var(--accent2));padding:4px 10px;border-radius:999px;font-size:11px;font-weight:700;color:#000}
+  .stats{display:flex;gap:12px;align-items:center}
+  .stat{background:var(--panel);border:1px solid var(--border);padding:6px 12px;border-radius:8px;font-size:12px}
+  .stat b{color:var(--accent)}
+  #sidebar{position:absolute;left:12px;top:68px;bottom:12px;width:340px;background:rgba(17,26,46,0.92);backdrop-filter:blur(16px);border:1px solid var(--border);border-radius:16px;z-index:5;display:flex;flex-direction:column;overflow:hidden}
+  #search{margin:12px;padding:10px 14px;background:#0b111e;border:1px solid var(--border);border-radius:10px;color:#e2e8f0;outline:none}
+  #flightList{flex:1;overflow:auto;padding:0 8px 8px}
+  .flight{padding:10px 12px;border-radius:10px;border:1px solid transparent;display:flex;justify-content:space-between;align-items:center;cursor:pointer}
+  .flight:hover{background:#0f1a30;border-color:var(--border)}
+  .flight.active{background:#122040;border-color:var(--accent)}
+  .callsign{font-weight:700;color:#fff}
+  .meta{font-size:11px;color:#94a3b8}
+  .alt{font-size:11px;color:var(--accent)}
+  #detail{position:absolute;right:12px;top:68px;width:320px;background:rgba(17,26,46,0.95);border:1px solid var(--border);border-radius:16px;padding:16px;z-index:5;display:none}
+  #detail.show{display:block}
+  .plane-icon{width:24px;height:24px;background:var(--accent);mask:url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9L2 14v2l8-2.5V21l2 1 2-1v-7.5L21 16z"/></svg>') center/contain no-repeat;-webkit-mask:url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9L2 14v2l8-2.5V21l2 1 2-1v-7.5L21 16z"/></svg>') center/contain no-repeat}
 </style>
 </head>
 <body>
-<div class="nav"><div class="wrap"><div class="mono small">FLIGHT-STACK • CLOUDFLARE • COMMERCIAL-READY</div><div style="display:flex;gap:8px"><a class="kbd" href="#deploy">Deploy</a><a class="kbd" href="#stack">Stack</a></div></div></div>
-
-<div class="hero"><div class="wrap">
-<div class="badge">● COMMERCIAL BUILD • NO OPENSKY DEPENDENCY • CLOUDFLARE PAGES + FUNCTIONS</div>
-<h1>Free Flight Tracking — built for commercial use on Cloudflare</h1>
-<p style="color:var(--dim);max-width:720px;line-height:1.6">Same info you gave, but re-architected for commercial. OpenSky is research/non-commercial, so this build uses <b style="color:var(--text)">ADSB.lol + self-hosted readsb</b> as primary live feed, Cloudflare Pages Functions as cache/proxy to avoid CORS and rate-limits, and NAT Tracks from free parser.</p>
-<div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap">
-<button class="btn" onclick="document.getElementById('deploy').scrollIntoView({behavior:'smooth'})">Deploy to Cloudflare →</button>
-<a class="btn btn-ghost" href="https://github.com/adsblol/api" target="_blank">ADSB.lol API</a>
+<header>
+  <div class="logo"><div class="logo-dot"></div> FLYINGTRACKER <span class="badge">LIVE</span> <span style="font-size:11px;color:#64748b;margin-left:8px">flyingtracker.pages.dev</span></div>
+  <div class="stats">
+    <div class="stat"><b id="planeCount">0</b> planes</div>
+    <div class="stat"><b id="apiStatus">CONNECTING...</b></div>
+  </div>
+</header>
+<div id="map"></div>
+<div id="sidebar">
+  <input id="search" placeholder="Search callsign, e.g. PIA, EK415..." />
+  <div id="flightList"></div>
 </div>
-</div></div>
-
-<div class="wrap" style="padding:24px 20px">
-<!-- COMMERCIAL NOTE -->
-<div class="card" style="border-color:rgba(0,212,255,.25);background:rgba(0,212,255,.06)">
-<div class="mono small" style="color:var(--accent)">COMMERCIAL LICENSE NOTE</div>
-<div style="margin-top:8px;line-height:1.6;font-size:13px;color:var(--dim)">For commercial you <b style="color:var(--text)">cannot rely on OpenSky's non-commercial terms</b> at scale. This Cloudflare build defaults to: <span class="kbd">ADSB.lol (open license)</span> + <span class="kbd">Your own RTL-SDR → readsb</span> fed into Cloudflare. Functions below cache for 5-10s to protect you from upstream limits and give you “effectively unlimited” to your users via Cloudflare CDN.</div>
-</div>
-
-<!-- STACK TABLE -->
-<h2 id="stack" style="margin:28px 0 12px">Recommended free stack (commercial-safe)</h2>
-<div class="card" style="padding:0;overflow:auto">
-<table class="table">
-<tr><th>Need</th><th>Best free option</th><th>Limits / notes</th></tr>
-<tr><td>Live global (commercial-safe)</td><td><b>ADSB.lol API</b> — openly licensed, unfiltered</td><td>Check /api docs, cache on Cloudflare. Your users hit CF edge, not upstream.</td></tr>
-<tr><td>Live no-quota</td><td><b>Own RTL-SDR + readsb + tar1090</b></td><td>Only aircraft your antenna hears, but 0 quota. Push to CF via Worker.</td></tr>
-<tr><td>NAT tracks</td><td><b>aogden41/NAT-Tracks</b> or self-parse NTM</td><td>JSON: id, TMI, route lat/lon, FLs, direction. Cron 2x daily.</td></tr>
-<tr><td>Aero ref</td><td><b>OurAirports + NOTAC API</b></td><td>Public domain. FAA SWIM requires agreement but no data cost.</td></tr>
-<tr><td>Maps</td><td><b>MapLibre GL + OSM / Cloudflare R2 tiles</b></td><td>MapLibre is BSD. No Mapbox token needed.</td></tr>
-<tr><td>Hosting / cache</td><td><b>Cloudflare Pages + Pages Functions</b></td><td>Free tier: unlimited bandwidth, KV/R2 for track cache, 10s cache header.</td></tr>
-</table>
-</div>
-
-<!-- ARCH -->
-<h2 style="margin:28px 0 12px">Architecture for commercial “no limits”</h2>
-<div class="grid grid-2">
-<div class="card">
-<div class="mono small">FLOW</div>
-<div class="code" style="margin-top:10px;white-space:pre">Antenna 1090MHz
-  → RTL-SDR (Pi / VPS)
-  → readsb / dump1090-fa
-  → tar1090 JSON
-  → Cloudflare Worker POST /api/ingest
-  → R2 / KV + Pages Functions /api/live
-  → Browser MapLibre (your users = CF edge cache, 0 upstream quota)
-
-Fallback: ADSB.lol /api/v2/lat/lon/dist → same /api/live cache
-NAT: cron Worker fetches NAT-Tracks API → KV
-</div>
-</div>
-<div class="grid" style="gap:12px">
-<div class="card"><b>1. Cloudflare Pages</b><div class="small" style="margin-top:6px">Host this index.html. Free, global CDN, custom domain, unlimited bandwidth. Commercial allowed.</div></div>
-<div class="card"><b>2. Pages Functions /api/live & /api/tracks</b><div class="small" style="margin-top:6px">Proxy + cache. Adds Cache-Control: public, s-maxage=10. Protects ADSB.lol from your traffic. Your users never hit origin directly.</div></div>
-<div class="card"><b>3. Optional: ingest from own receiver</b><div class="small" style="margin-top:6px">Small Pi script posts to your Worker secret endpoint. You now own global + local feed.</div></div>
-</div>
-</div>
-
-<!-- CODE EXAMPLES -->
-<h2 style="margin:28px 0 12px">Included Cloudflare Functions (in this package)</h2>
-<div class="grid grid-2">
-<div class="card"><div class="mono small">functions/api/live.js — ADSB.lol proxy + cache</div><div class="code">export async function onRequest(context){
-  const { request, env } = context
-  const url = new URL(request.url)
-  const lat = url.searchParams.get('lat') || '50'
-  const lon = url.searchParams.get('lon') || '-25'
-  const dist = url.searchParams.get('dist') || '500'
-  const upstream = `https://api.adsb.lol/v2/lat/${lat}/lon/${lon}/dist/${dist}`
-  const res = await fetch(upstream, { cf: { cacheTtl: 10 } })
-  return new Response(res.body, {
-    headers: {
-      'Content-Type': 'application/json',
-      'Cache-Control': 'public, s-maxage=10, stale-while-revalidate=20',
-      'Access-Control-Allow-Origin': '*'
-    }
-  })
-}</div></div>
-<div class="card"><div class="mono small">functions/api/tracks.js — NAT tracks proxy</div><div class="code">export async function onRequest({ request }){
-  const upstream = 'https://nat-tracks.aogden41.workers.dev/api/tracks'
-  // fallback: you can replace with your own NTM parser KV
-  const r = await fetch(upstream, { cf: { cacheTtl: 300 } })
-  const data = await r.text()
-  return new Response(data, {
-    headers: {
-      'Content-Type': 'application/json',
-      'Cache-Control': 'public, s-maxage=300',
-      'Access-Control-Allow-Origin': '*'
-    }
-  })
-}</div></div>
-</div>
-
-<!-- DEPLOY -->
-<h2 id="deploy" style="margin:32px 0 12px">Deploy to Cloudflare (2 min)</h2>
-<div class="card">
-<ol style="line-height:1.8;font-size:14px;color:var(--dim);margin:0;padding-left:18px">
-<li><b style="color:var(--text)">Upload to Cloudflare:</b> Go to dash.cloudflare.com → Pages → Create project → Upload assets. Drag the whole <span class="kbd">cloudflare-flight-tracker</span> folder (this file + /functions).</li>
-<li><b style="color:var(--text)">Framework preset:</b> None. Build command empty, output directory <span class="kbd">/</span> or <span class="kbd">.</span></li>
-<li><b style="color:var(--text)">Add domain:</b> Pages → Custom domains → yourdomain.com (free SSL).</li>
-<li><b style="color:var(--text)">Commercial tip:</b> In Pages → Settings → Functions, add KV namespace <span class="kbd">TRACKS</span> if you want to cache NAT tracks beyond 5 min. No env vars needed for basic version.</li>
-<li><b style="color:var(--text)">Test live:</b> After deploy, open <span class="kbd">yourdomain.com/api/live?lat=50&lon=-25&dist=500</span> and <span class="kbd">/api/tracks</span>. Should return JSON with CF cache headers.</li>
-<li><b style="color:var(--text)">Own receiver (optional but gives you unlimited):</b> On your Pi: <span class="kbd">readsb --json --net</span> → POST every 5s to a secret Worker <span class="kbd">/api/ingest</span> you add. Then your /api/live merges local + ADSB.lol.</li>
-</ol>
-<div style="margin-top:16px;display:flex;gap:10px"><span class="kbd">Cost: $0 on Free plan</span><span class="kbd">Bandwidth: Unlimited</span><span class="kbd">License: Commercial OK</span></div>
-</div>
-
-<div class="grid grid-3" style="margin-top:18px">
-<div class="card"><div class="mono small">Why Cloudflare over Vercel for commercial</div><div class="small" style="margin-top:8px;line-height:1.6">Vercel free = 100GB bandwidth, function timeouts, non-commercial edge cache nuances. Cloudflare Pages free = unlimited bandwidth, 0$ R2 for tiles, Workers KV for NAT cache, and you can keep ADSB keys server-side.</div></div>
-<div class="card"><div class="mono small">NAT Tracks daily</div><div class="small" style="margin-top:8px;line-height:1.6">Tracks published twice daily: eastbound ~1400Z, westbound ~2200Z. Valid window over 30°W. This build caches them for 5 min on edge. Add a Cron Worker to fetch twice daily for production.</div></div>
-<div class="card"><div class="mono small">What to show on map</div><div class="small" style="margin-top:8px;line-height:1.6">MapLibre + GeoJSON: Polyline for track route, Circle for waypoints, tooltip with ID, TMI, FLs, validity. Aircraft layer from /api/live. Auto-refresh 10s.</div></div>
-</div>
-
-<div style="margin:28px 0 80px;text-align:center" class="small">Built for commercial self-host. No OpenSky dependency. Uses ADSB.lol (open) + your own SDR for true no-limit.</div>
-</div>
-</body>
-</html>
+<div id="detail">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+    <div class="callsign" id="d_callsign" style="font-size:18px">-</div>
+    <div style="cursor:pointer" onclick="document.getElementById('detail').classList.remove('show')">✕</div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:12px">
+    <div><div class="meta">Altitude</div><b id="d_alt">-</b></div>
+    <div><div class="meta">Speed</div><b id="d_spd">-</b> kts</div>
+    <div><div class="meta">Heading</div><b id="d_h
