@@ -1,23 +1,20 @@
-export async function onRequest(context){
-  const { request } = context
-  const url = new URL(request.url)
-  const lat = url.searchParams.get('lat') || '50'
-  const lon = url.searchParams.get('lon') || '-25'
-  const dist = url.searchParams.get('dist') || '500'
-  const upstream = `https://api.adsb.lol/v2/lat/${lat}/lon/${lon}/dist/${dist}`
+export async function onRequest(context) {
   try {
-    const res = await fetch(upstream, { cf: { cacheTtl: 10 } })
-    const body = await res.text()
-    return new Response(body, {
-      status: res.status,
+    const res = await fetch('https://api.adsb.lol/v2/mil', {
+      headers: { 'Accept': 'application/json' }
+    });
+    const data = await res.json();
+    return new Response(JSON.stringify(data), {
       headers: {
         'Content-Type': 'application/json',
-        'Cache-Control': 'public, s-maxage=10, stale-while-revalidate=20',
         'Access-Control-Allow-Origin': '*',
-        'X-Upstream': 'adsb.lol'
+        'Cache-Control': 'public, max-age=10, s-maxage=10'
       }
-    })
-  } catch (e){
-    return new Response(JSON.stringify({error: String(e), hint: 'ADSB.lol may be down, try again'}), { status: 502, headers: {'Content-Type':'application/json','Access-Control-Allow-Origin':'*'}})
+    });
+  } catch (e) {
+    return new Response(JSON.stringify({ ac: [], error: e.message }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+    });
   }
 }
