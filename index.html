@@ -25,7 +25,7 @@
   .flight:hover{background:#1a2747}
   #detail{position:absolute;right:10px;top:66px;width:300px;background:#111a2e;border:1px solid var(--border);border-radius:12px;padding:12px;z-index:5;display:none}
   #detail.show{display:block}
-  .plane{width:20px;height:20px;background:#00d9ff;border-radius:50%;border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:10px}
+  .plane{width:22px;height:22px;background:#00d9ff;border-radius:50%;border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:12px;cursor:pointer}
 </style>
 </head>
 <body>
@@ -50,7 +50,6 @@
   </div>
 </div>
 <script>
-// FIXED MAP - OpenFreeMap is 100% free, no key needed
 const map = new maplibregl.Map({
   container: 'map',
   style: 'https://tiles.openfreemap.org/styles/liberty',
@@ -61,16 +60,41 @@ map.addControl(new maplibregl.NavigationControl(), 'bottom-right');
 
 let planes = new Map();
 let markers = new Map();
+let lastGoodData = [];
 
 async function fetchLive(){
   try{
     document.getElementById('apiStatus').textContent = 'LOADING...';
-    // Direct fetch, no /api needed - ADSB.lol allows CORS
-    const res = await fetch('https://api.allorigins.win/raw?url=https://api.adsb.lol/v2/mil', {cache:'no-store'});
-    const data = await res.json();
-    const ac = data.ac || [];
+    let data = null;
+    
+    const urls = [
+      '/api/live',
+      'https://api.adsb.lol/v2/mil',
+      'https://api.allorigins.win/raw?url=https://api.adsb.lol/v2/mil'
+    ];
+    
+    for(let url of urls){
+      try{
+        const res = await fetch(url, {cache:'no-store'});
+        const text = await res.text();
+        if(text.trim().startsWith('<')) continue;
+        const j = JSON.parse(text);
+        if(j.ac && j.ac.length > 0){ data = j; break; }
+      }catch(e){ continue; }
+    }
+    
+    if(!data || !data.ac || data.ac.length === 0){
+      if(lastGoodData.length > 0){
+        document.getElementById('apiStatus').textContent = 'LIVE (cached) • '+lastGoodData.length;
+        return;
+      }
+      throw new Error('No data');
+    }
+    
+    lastGoodData = data.ac;
+    const ac = data.ac;
     document.getElementById('planeCount').textContent = ac.length;
-    document.getElementById('apiStatus').textContent = 'LIVE';
+    document.getElementById('apiStatus').textContent = 'LIVE • '+ac.length;
     document.getElementById('apiStatus').style.color = '#22c55e';
     
     const seen = new Set();
@@ -93,9 +117,11 @@ async function fetchLive(){
     markers.forEach((m,id)=>{ if(!seen.has(id)){ m.remove(); markers.delete(id); planes.delete(id);} });
     renderList();
   }catch(e){
-    console.error(e);
-    document.getElementById('apiStatus').textContent = 'ERROR: '+e.message;
-    document.getElementById('flightList').textContent = 'API Error, retrying... '+e.message;
+    if(lastGoodData.length > 0){
+      document.getElementById('apiStatus').textContent = 'LIVE (cached) • '+lastGoodData.length;
+    } else {
+      document.getElementById('apiStatus').textContent = 'RETRYING...';
+    }
   }
 }
 
@@ -106,12 +132,10 @@ function renderList(){
     if(!q) return true;
     return (p.flight||'').toLowerCase().includes(q) || (p.hex||'').toLowerCase().includes(q);
   }).slice(0,100);
-  
-  if(arr.length===0){ list.innerHTML = 'No planes match "'+q+'" - try empty search'; return; }
-  
+  if(arr.length===0){ list.innerHTML = 'No match for "'+q+'"'; return; }
   list.innerHTML = arr.map(p=>`
     <div class="flight" onclick="showDetail('${p.hex}')">
-      <span>${(p.flight||'').trim()||p.hex} </span>
+      <span>${(p.flight||'').trim()||p.hex}</span>
       <span style="color:#00d9ff">${p.alt_baro||'GND'}</span>
     </div>
   `).join('');
@@ -129,12 +153,8 @@ window.showDetail = (hex)=>{
 }
 
 document.getElementById('search').addEventListener('input', renderList);
-
-// CRITICAL FIX: Call immediately, don't wait for map load!
 fetchLive();
 setInterval(fetchLive, 5000);
-map.on('load', ()=> console.log('Map loaded'));
-map.on('error', (e)=> console.log('Map error', e));
 </script>
 </body>
 </html>
