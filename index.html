@@ -42,7 +42,7 @@
   <div id="flightList">Loading planes...</div>
 </div>
 <div id="detail">
-  <div style="display:flex;justify-content:space-between"><b id="d_callsign">-</b><span onclick="detail.classList.remove('show')" style="cursor:pointer">✕</span></div>
+  <div style="display:flex;justify-content:space-between"><b id="d_callsign">-</b><span onclick="document.getElementById('detail').classList.remove('show')" style="cursor:pointer">✕</span></div>
   <div style="margin-top:8px;font-size:12px;line-height:1.8">
     Alt: <b id="d_alt">-</b><br>
     Speed: <b id="d_spd">-</b><br>
@@ -66,7 +66,7 @@ async function fetchLive(){
   try{
     document.getElementById('apiStatus').textContent = 'LOADING...';
     // Direct fetch, no /api needed - ADSB.lol allows CORS
-    const res = await fetch('/api/live', {cache:'no-store'});
+    const res = await fetch('https://api.allorigins.win/raw?url=https://api.adsb.lol/v2/mil', {cache:'no-store'});
     const data = await res.json();
     const ac = data.ac || [];
     document.getElementById('planeCount').textContent = ac.length;
