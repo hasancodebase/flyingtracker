@@ -3,11 +3,11 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>FlyingTracker — Live</title>
+<title>FlyingTracker — Mil + Civil Live</title>
 <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <style>
-  :root{ --bg:#0b111e; --panel:#111a2e; --border:#1e2d50; --accent:#00d9ff; }
+  :root{ --bg:#0b111e; --panel:#111a2e; --border:#1e2d50; --accent:#00d9ff; --mil:#ef4444; --pia:#22c55e; }
   *{margin:0;padding:0;box-sizing:border-box}
   body{background:var(--bg);color:#e2e8f0;font-family:monospace;overflow:hidden}
   #map{position:absolute;inset:0;top:56px}
@@ -15,146 +15,197 @@
   .logo{display:flex;align-items:center;gap:8px;font-weight:800}
   .dot{width:10px;height:10px;background:#22c55e;border-radius:50%;animation:pulse 2s infinite}
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
-  .badge{background:var(--accent);color:#000;padding:3px 8px;border-radius:99px;font-size:10px;font-weight:800}
-  .stats{display:flex;gap:10px}
+  .badge{padding:3px 8px;border-radius:99px;font-size:10px;font-weight:800;color:#000}
+  .badge.live{background:var(--accent)} .badge.mil{background:var(--mil);color:#fff}
+  .stats{display:flex;gap:8px;align-items:center}
   .stat{background:var(--panel);border:1px solid var(--border);padding:5px 10px;border-radius:8px;font-size:12px}
-  #sidebar{position:absolute;left:10px;top:66px;bottom:10px;width:320px;background:rgba(17,26,46,0.9);border:1px solid var(--border);border-radius:12px;z-index:5;display:flex;flex-direction:column}
+  .filter{cursor:pointer;transition:all .2s} .filter.active{border-color:var(--accent);color:var(--accent)}
+  #sidebar{position:absolute;left:10px;top:66px;bottom:10px;width:360px;background:rgba(17,26,46,0.92);border:1px solid var(--border);border-radius:12px;z-index:5;display:flex;flex-direction:column}
   #search{margin:10px;padding:8px 12px;background:#0b111e;border:1px solid var(--border);border-radius:8px;color:#fff}
   #flightList{flex:1;overflow:auto;padding:0 8px 8px;font-size:12px}
-  .flight{padding:8px;border-radius:8px;cursor:pointer;display:flex;justify-content:space-between;margin-bottom:4px}
-  .flight:hover{background:#1a2747}
-  #detail{position:absolute;right:10px;top:66px;width:300px;background:#111a2e;border:1px solid var(--border);border-radius:12px;padding:12px;z-index:5;display:none}
+  .flight{padding:8px;border-radius:8px;cursor:pointer;display:flex;justify-content:space-between;margin-bottom:4px;border:1px solid transparent}
+  .flight:hover{background:#1a2747} .flight.mil{border-left:3px solid var(--mil)} .flight.pia{border-left:3px solid var(--pia)}
+  #detail{position:absolute;right:10px;top:66px;width:320px;background:#111a2e;border:1px solid var(--border);border-radius:12px;padding:12px;z-index:5;display:none}
   #detail.show{display:block}
-  .plane{width:22px;height:22px;background:#00d9ff;border-radius:50%;border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:12px;cursor:pointer}
+  .plane{width:10px;height:10px;border-radius:50%;border:1.5px solid #fff;box-shadow:0 0 8px currentColor;cursor:pointer}
+  .plane.mil{background:var(--mil);color:var(--mil)} .plane.civil{background:var(--accent);color:var(--accent)} .plane.pia{background:var(--pia);color:var(--pia);width:12px;height:12px}
+  .legend{position:absolute;bottom:20px;left:380px;z-index:5;background:rgba(17,26,46,0.9);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:11px;display:flex;gap:12px}
 </style>
 </head>
 <body>
 <header>
-  <div class="logo"><div class="dot"></div> FLYINGTRACKER <span class="badge">LIVE</span></div>
+  <div class="logo"><div class="dot"></div> FLYINGTRACKER <span class="badge live">LIVE</span> <span class="badge mil">MIL+CIVIL</span></div>
   <div class="stats">
     <div class="stat"><b id="planeCount">0</b> planes</div>
-    <div class="stat" id="apiStatus">CONNECTING...</div>
+    <div class="stat filter active" id="f_all" onclick="setFilter('all')">ALL</div>
+    <div class="stat filter" id="f_mil" onclick="setFilter('mil')">🔴 MIL</div>
+    <div class="stat filter" id="f_civil" onclick="setFilter('civil')">🔵 CIVIL</div>
+    <div class="stat filter" id="f_pia" onclick="setFilter('pia')">🟢 PIA</div>
+    <div class="stat" id="apiStatus">LOADING...</div>
   </div>
 </header>
 <div id="map"></div>
 <div id="sidebar">
-  <input id="search" placeholder="Search PIA, EK..." />
-  <div id="flightList">Loading planes...</div>
+  <input id="search" placeholder="Search PIA, RCH, EK..." />
+  <div id="flightList">Loading mil + civil worldwide...</div>
 </div>
 <div id="detail">
   <div style="display:flex;justify-content:space-between"><b id="d_callsign">-</b><span onclick="document.getElementById('detail').classList.remove('show')" style="cursor:pointer">✕</span></div>
   <div style="margin-top:8px;font-size:12px;line-height:1.8">
+    <div id="d_type" style="font-weight:800"></div>
+    Flight: <b id="d_flight">-</b><br>
     Alt: <b id="d_alt">-</b><br>
     Speed: <b id="d_spd">-</b><br>
+    Hex: <b id="d_hex">-</b><br>
     Pos: <b id="d_pos">-</b>
   </div>
+</div>
+<div class="legend">
+  <span><span style="display:inline-block;width:8px;height:8px;background:#ef4444;border-radius:50%"></span> Military (RCH, etc)</span>
+  <span><span style="display:inline-block;width:8px;height:8px;background:#00d9ff;border-radius:50%"></span> Civil</span>
+  <span><span style="display:inline-block;width:10px;height:10px;background:#22c55e;border-radius:50%"></span> PIA Pakistan</span>
 </div>
 <script>
 const map = new maplibregl.Map({
   container: 'map',
   style: 'https://tiles.openfreemap.org/styles/liberty',
-  center: [67.0011, 24.8607],
-  zoom: 4
+  center: [67, 24],
+  zoom: 3
 });
 map.addControl(new maplibregl.NavigationControl(), 'bottom-right');
 
 let planes = new Map();
 let markers = new Map();
-let lastGoodData = [];
+let filter = 'all';
+
+window.setFilter = (f)=>{
+  filter = f;
+  document.querySelectorAll('.filter').forEach(el=> el.classList.remove('active'));
+  document.getElementById('f_'+f).classList.add('active');
+  renderList();
+  // Update markers visibility
+  markers.forEach((m,hex)=>{
+    const p = planes.get(hex);
+    const show = shouldShow(p);
+    m.getElement().style.display = show ? 'block' : 'none';
+  });
+}
+
+function isMil(p){
+  const f = (p.flight||'').trim().toUpperCase();
+  return f.startsWith('RCH') || f.startsWith('CNV') || f.startsWith('G7') || f.startsWith('AE0') || f.startsWith('AE1') || p.mil || f.includes('COBRA') || f.includes('【entity-TIGER¦canonical_name=TIGER】');
+}
+function isPIA(p){ return (p.flight||'').toUpperCase().includes('PIA') || (p.flight||'').toUpperCase().includes('PK'); }
+function shouldShow(p){
+  if(!p) return false;
+  if(filter==='all') return true;
+  if(filter==='mil') return isMil(p);
+  if(filter==='civil') return !isMil(p);
+  if(filter==='pia') return isPIA(p);
+  return true;
+}
 
 async function fetchLive(){
   try{
     document.getElementById('apiStatus').textContent = 'LOADING...';
-    let data = null;
+    let allAc = [];
     
-    const urls = [
-      '/api/live',
-      'https://api.adsb.lol/v2/mil',
-      'https://api.allorigins.win/raw?url=https://api.adsb.lol/v2/mil'
-    ];
-    
+    // Fetch BOTH mil + all, merge
+    const urls = ['https://api.adsb.lol/v2/mil', 'https://api.adsb.lol/v2/all'];
     for(let url of urls){
       try{
         const res = await fetch(url, {cache:'no-store'});
-        const text = await res.text();
-        if(text.trim().startsWith('<')) continue;
-        const j = JSON.parse(text);
-        if(j.ac && j.ac.length > 0){ data = j; break; }
-      }catch(e){ continue; }
-    }
-    
-    if(!data || !data.ac || data.ac.length === 0){
-      if(lastGoodData.length > 0){
-        document.getElementById('apiStatus').textContent = 'LIVE (cached) • '+lastGoodData.length;
-        return;
+        const j = await res.json();
+        if(j.ac) allAc = allAc.concat(j.ac);
+      }catch(e){ 
+        try{
+          const res2 = await fetch('https://api.allorigins.win/raw?url='+encodeURIComponent(url), {cache:'no-store'});
+          const txt = await res2.text();
+          if(!txt.startsWith('<')){ const j = JSON.parse(txt); if(j.ac) allAc = allAc.concat(j.ac); }
+        }catch(e2){}
       }
-      throw new Error('No data');
     }
     
-    lastGoodData = data.ac;
-    const ac = data.ac;
-    document.getElementById('planeCount').textContent = ac.length;
-    document.getElementById('apiStatus').textContent = 'LIVE • '+ac.length;
+    // Deduplicate by hex
+    const mapByHex = new Map();
+    allAc.forEach(p=>{ if(p.hex && p.lat && p.lon){ mapByHex.set(p.hex, p); } });
+    let ac = Array.from(mapByHex.values());
+    
+    // Sort: PIA first, then MIL, then rest
+    ac.sort((a,b)=>{
+      if(isPIA(a) && !isPIA(b)) return -1;
+      if(!isPIA(a) && isPIA(b)) return 1;
+      if(isMil(a) && !isMil(b)) return -1;
+      if(!isMil(a) && isMil(b)) return 1;
+      return 0;
+    });
+    
+    // Show top 2500 worldwide (enough for all mil + civil nearby)
+    ac = ac.slice(0, 2500);
+    
+    document.getElementById('planeCount').textContent = mapByHex.size + ' ('+ac.length+' shown)';
+    document.getElementById('apiStatus').textContent = 'LIVE • '+ac.filter(isMil).length+' MIL';
     document.getElementById('apiStatus').style.color = '#22c55e';
     
     const seen = new Set();
     ac.forEach(p=>{
-      if(!p.lat || !p.lon || !p.hex) return;
       seen.add(p.hex);
       planes.set(p.hex, p);
       let m = markers.get(p.hex);
       const el = document.createElement('div');
-      el.className = 'plane';
-      el.textContent = '✈';
+      let cls = 'plane ';
+      if(isPIA(p)) cls+='pia'; else if(isMil(p)) cls+='mil'; else cls+='civil';
+      el.className = cls;
+      el.title = (p.flight||'').trim()||p.hex;
       if(!m){
         m = new maplibregl.Marker({element: el}).setLngLat([p.lon, p.lat]).addTo(map);
         m.getElement().addEventListener('click', ()=> showDetail(p.hex));
         markers.set(p.hex, m);
       }else{
         m.setLngLat([p.lon, p.lat]);
+        m.getElement().className = cls;
       }
+      m.getElement().style.display = shouldShow(p) ? 'block' : 'none';
     });
-    markers.forEach((m,id)=>{ if(!seen.has(id)){ m.remove(); markers.delete(id); planes.delete(id);} });
+    
     renderList();
   }catch(e){
-    if(lastGoodData.length > 0){
-      document.getElementById('apiStatus').textContent = 'LIVE (cached) • '+lastGoodData.length;
-    } else {
-      document.getElementById('apiStatus').textContent = 'RETRYING...';
-    }
+    console.error(e);
+    document.getElementById('apiStatus').textContent = 'RETRYING...';
   }
 }
 
 function renderList(){
   const q = (document.getElementById('search').value||'').toLowerCase();
   const list = document.getElementById('flightList');
-  const arr = Array.from(planes.values()).filter(p=>{
-    if(!q) return true;
-    return (p.flight||'').toLowerCase().includes(q) || (p.hex||'').toLowerCase().includes(q);
-  }).slice(0,100);
-  if(arr.length===0){ list.innerHTML = 'No match for "'+q+'"'; return; }
+  let arr = Array.from(planes.values()).filter(shouldShow);
+  if(q){ arr = arr.filter(p=> (p.flight||'').toLowerCase().includes(q) || (p.hex||'').toLowerCase().includes(q)); }
+  arr = arr.slice(0,300);
   list.innerHTML = arr.map(p=>`
-    <div class="flight" onclick="showDetail('${p.hex}')">
-      <span>${(p.flight||'').trim()||p.hex}</span>
-      <span style="color:#00d9ff">${p.alt_baro||'GND'}</span>
+    <div class="flight ${isMil(p)?'mil':''} ${isPIA(p)?'pia':''}" onclick="showDetail('${p.hex}')">
+      <span>${isMil(p)?'🔴':''}${isPIA(p)?'🟢':''} ${(p.flight||'').trim()||p.hex}</span>
+      <span style="color:${isMil(p)?'#ef4444':'#00d9ff'}">${p.alt_baro||'GND'}</span>
     </div>
-  `).join('');
+  `).join('') || 'No planes for filter';
 }
 
 window.showDetail = (hex)=>{
-  const p = planes.get(hex);
-  if(!p) return;
+  const p = planes.get(hex); if(!p) return;
   document.getElementById('detail').classList.add('show');
   document.getElementById('d_callsign').textContent = (p.flight||'').trim()||hex;
+  document.getElementById('d_type').textContent = isPIA(p)?'🟢 PIA PAKISTAN' : isMil(p)?'🔴 MILITARY' : '🔵 CIVIL';
+  document.getElementById('d_type').style.color = isPIA(p)?'#22c55e' : isMil(p)?'#ef4444' : '#00d9ff';
+  document.getElementById('d_flight').textContent = (p.flight||'').trim()||'-';
   document.getElementById('d_alt').textContent = (p.alt_baro||'Ground')+' ft';
   document.getElementById('d_spd').textContent = (p.gs?Math.round(p.gs)+' kts':'-');
-  document.getElementById('d_pos').textContent = p.lat.toFixed(2)+','+p.lon.toFixed(2);
-  map.flyTo({center:[p.lon,p.lat], zoom:6});
+  document.getElementById('d_hex').textContent = p.hex;
+  document.getElementById('d_pos').textContent = p.lat.toFixed(3)+','+p.lon.toFixed(3);
+  map.flyTo({center:[p.lon,p.lat], zoom:5});
 }
 
 document.getElementById('search').addEventListener('input', renderList);
 fetchLive();
-setInterval(fetchLive, 5000);
+setInterval(fetchLive, 8000);
 </script>
 </body>
 </html>
