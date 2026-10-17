@@ -66,7 +66,7 @@ async function fetchLive(){
   try{
     document.getElementById('apiStatus').textContent = 'LOADING...';
     // Direct fetch, no /api needed - ADSB.lol allows CORS
-    const res = await fetch('https://api.adsb.lol/v2/mil', {cache:'no-store'});
+    const res = await fetch('/api/live', {cache:'no-store'});
     const data = await res.json();
     const ac = data.ac || [];
     document.getElementById('planeCount').textContent = ac.length;
