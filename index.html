@@ -10,17 +10,17 @@
   :root{ --bg:#0b111e; --panel:#111a2e; --border:#1e2d50; --accent:#00d9ff; --mil:#ef4444; --pia:#22c55e; }
   *{margin:0;padding:0;box-sizing:border-box}
   body{background:var(--bg);color:#e2e8f0;font-family:monospace;overflow:hidden}
-  #map{position:absolute;inset:0;top:56px}
+  #map{position:absolute;inset:0;top:56px;background:#0a0f1e}
   header{height:56px;background:#0b111e;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 16px;z-index:10;position:relative}
   .logo{display:flex;align-items:center;gap:8px;font-weight:800}
   .dot{width:10px;height:10px;background:#22c55e;border-radius:50%;animation:pulse 2s infinite}
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
   .badge{padding:3px 8px;border-radius:99px;font-size:10px;font-weight:800;color:#000}
   .badge.live{background:var(--accent)} .badge.mil{background:var(--mil);color:#fff}
-  .stats{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .stats{display:flex;gap:8px;align-items:center}
   .stat{background:var(--panel);border:1px solid var(--border);padding:5px 10px;border-radius:8px;font-size:12px}
   .filter{cursor:pointer} .filter.active{border-color:var(--accent);color:var(--accent)}
-  #sidebar{position:absolute;left:10px;top:66px;bottom:10px;width:360px;background:rgba(17,26,46,0.92);border:1px solid var(--border);border-radius:12px;z-index:5;display:flex;flex-direction:column}
+  #sidebar{position:absolute;left:10px;top:66px;bottom:10px;width:360px;background:rgba(17,26,46,0.95);border:1px solid var(--border);border-radius:12px;z-index:5;display:flex;flex-direction:column}
   #search{margin:10px;padding:8px 12px;background:#0b111e;border:1px solid var(--border);border-radius:8px;color:#fff}
   #flightList{flex:1;overflow:auto;padding:0 8px 8px;font-size:12px}
   .flight{padding:8px;border-radius:8px;cursor:pointer;display:flex;justify-content:space-between;margin-bottom:4px;border-left:3px solid transparent}
@@ -28,7 +28,7 @@
   #detail{position:absolute;right:10px;top:66px;width:320px;background:#111a2e;border:1px solid var(--border);border-radius:12px;padding:12px;z-index:5;display:none}
   #detail.show{display:block}
   .plane{width:10px;height:10px;border-radius:50%;border:1.5px solid #fff;box-shadow:0 0 8px currentColor;cursor:pointer}
-  .plane.mil{background:var(--mil);color:var(--mil)} .plane.civil{background:var(--accent);color:var(--accent)} .plane.pia{background:var(--pia);color:var(--pia);width:12px;height:12px}
+  .plane.mil{background:var(--mil);color:var(--mil)} .plane.civil{background:var(--accent);color:var(--accent)} .plane.pia{background:var(--pia);color:var(--pia);width:13px;height:13px}
   .legend{position:absolute;bottom:20px;left:380px;z-index:5;background:rgba(17,26,46,0.9);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:11px;display:flex;gap:12px}
 </style>
 </head>
@@ -41,13 +41,13 @@
     <div class="stat filter" id="f_mil" onclick="setFilter('mil')">🔴 MIL</div>
     <div class="stat filter" id="f_civil" onclick="setFilter('civil')">🔵 CIVIL</div>
     <div class="stat filter" id="f_pia" onclick="setFilter('pia')">🟢 PIA</div>
-    <div class="stat" id="apiStatus">LOADING...</div>
+    <div class="stat" id="apiStatus">CONNECTING...</div>
   </div>
 </header>
 <div id="map"></div>
 <div id="sidebar">
   <input id="search" placeholder="Search PIA, RCH, EK..." />
-  <div id="flightList">Loading mil + civil worldwide...</div>
+  <div id="flightList">Loading worldwide...</div>
 </div>
 <div id="detail">
   <div style="display:flex;justify-content:space-between"><b id="d_callsign">-</b><span onclick="document.getElementById('detail').classList.remove('show')" style="cursor:pointer">✕</span></div>
@@ -56,7 +56,6 @@
     Flight: <b id="d_flight">-</b><br>
     Alt: <b id="d_alt">-</b><br>
     Speed: <b id="d_spd">-</b><br>
-    Hex: <b id="d_hex">-</b><br>
     Pos: <b id="d_pos">-</b>
   </div>
 </div>
@@ -68,9 +67,9 @@
 <script>
 const map = new maplibregl.Map({
   container: 'map',
-  style: 'https://tiles.openfreemap.org/styles/liberty',
+  style: 'https://demotiles.maplibre.org/style.json',
   center: [67, 24],
-  zoom: 3
+  zoom: 2
 });
 map.addControl(new maplibregl.NavigationControl(), 'bottom-right');
 
@@ -85,21 +84,17 @@ window.setFilter = (f)=>{
   renderList();
   markers.forEach((m,hex)=>{
     const p = planes.get(hex);
-    const show = shouldShow(p);
-    m.getElement().style.display = show ? 'block' : 'none';
+    m.getElement().style.display = shouldShow(p) ? 'block' : 'none';
   });
 }
 
-function isMil(p){
-  const f = (p.flight||'').trim().toUpperCase();
-  return f.startsWith('RCH') || f.startsWith('CNV') || f.startsWith('G7') || f.startsWith('AE0') || f.startsWith('AE1') || p.mil || f.includes('COBRA') || f.includes('TIGER');
-}
-function isPIA(p){ return (p.flight||'').toUpperCase().includes('PIA') || (p.flight||'').toUpperCase().includes('PK'); }
+function isMil(p){ const f=(p.flight||'').toUpperCase(); return f.startsWith('RCH')||f.startsWith('CNV')||f.includes('COBRA')||f.startsWith('G7')||p.type==='mil'; }
+function isPIA(p){ return (p.flight||'').toUpperCase().includes('PIA')||(p.flight||'').toUpperCase().includes('PK'); }
 function shouldShow(p){
   if(!p) return false;
   if(filter==='all') return true;
-  if(filter==='mil') return isMil(p);
-  if(filter==='civil') return !isMil(p);
+  if(filter==='mil') return p.type==='mil';
+  if(filter==='civil') return p.type==='civil';
   if(filter==='pia') return isPIA(p);
   return true;
 }
@@ -107,30 +102,121 @@ function shouldShow(p){
 async function fetchLive(){
   try{
     document.getElementById('apiStatus').textContent = 'LOADING...';
-    let allAc = [];
-    
-    const endpoints = [
-      'https://api.adsb.lol/v2/mil',
-      'https://api.adsb.lol/v2/all'
-    ];
-    
-    for(let api of endpoints){
-      try{
-        const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(api);
-        const res = await fetch(proxyUrl, {cache:'no-store'});
-        const txt = await res.text();
-        if(txt.trim().startsWith('<')) continue;
+    let all = [];
+
+    // 1. CIVIL WORLDWIDE - OpenSky (fast, CORS ok)
+    try{
+      const res = await fetch('https://opensky-network.org/api/states/all', {cache:'no-store'});
+      const j = await res.json();
+      if(j.states){
+        j.states.forEach(s=>{
+          // s: [icao24, callsign, origin, time, lastContact, lon, lat, baroAlt, onGround, vel, heading, vertRate, ...]
+          if(s[5] && s[6]){
+            all.push({hex:s[0], flight:(s[1]||'').trim(), lon:s[5], lat:s[6], alt_baro:Math.round(s[7]||0), gs:s[9], track:s[10], type:'civil'});
+          }
+        });
+      }
+    }catch(e){ console.log('opensky fail', e); }
+
+    // 2. MILITARY - adsb.lol mil via proxy (small file)
+    try{
+      const proxy = 'https://api.allorigins.win/raw?url='+encodeURIComponent('https://api.adsb.lol/v2/mil');
+      const res = await fetch(proxy, {cache:'no-store'});
+      const txt = await res.text();
+      if(!txt.startsWith('<')){
         const j = JSON.parse(txt);
-        if(j.ac) allAc = allAc.concat(j.ac);
-      }catch(e){ console.log('fail', api); }
-    }
-    
-    if(allAc.length === 0) throw new Error('no data');
-    
+        if(j.ac){
+          j.ac.forEach(p=>{
+            if(p.hex && p.lat && p.lon){
+              all.push({hex:p.hex, flight:(p.flight||'').trim(), lon:p.lon, lat:p.lat, alt_baro:p.alt_baro||0, gs:p.gs, track:p.track, type:'mil', mil:true});
+            }
+          });
+        }
+      }
+    }catch(e){ console.log('mil fail', e); }
+
+    if(all.length===0) throw new Error('no data yet');
+
+    // Deduplicate and sort
     const mapByHex = new Map();
-    allAc.forEach(p=>{ if(p.hex && p.lat && p.lon) mapByHex.set(p.hex, p); });
+    all.forEach(p=> mapByHex.set(p.hex, p));
     let ac = Array.from(mapByHex.values());
-    
     ac.sort((a,b)=>{
-      if(isPIA(a) && !isPIA(b)) return -1;
-      if(!isPIA(a
+      if(isPIA(a)&&!isPIA(b)) return -1;
+      if(!isPIA(a)&&isPIA(b)) return 1;
+      if(a.type==='mil'&&b.type!=='mil') return -1;
+      if(a.type!=='mil'&&b.type==='mil') return 1;
+      return 0;
+    });
+    ac = ac.slice(0, 3000);
+
+    document.getElementById('planeCount').textContent = mapByHex.size;
+    const milCount = ac.filter(p=>p.type==='mil').length;
+    document.getElementById('apiStatus').textContent = 'LIVE • '+milCount+' MIL';
+    document.getElementById('apiStatus').style.color = '#22c55e';
+
+    const seen = new Set();
+    ac.forEach(p=>{
+      seen.add(p.hex);
+      planes.set(p.hex, p);
+      let m = markers.get(p.hex);
+      const el = document.createElement('div');
+      let cls = 'plane ';
+      if(isPIA(p)) cls+='pia';
+      else if(p.type==='mil') cls+='mil';
+      else cls+='civil';
+      el.className = cls;
+      el.title = p.flight||p.hex;
+      if(!m){
+        m = new maplibregl.Marker({element: el}).setLngLat([p.lon, p.lat]).addTo(map);
+        m.getElement().addEventListener('click', ()=> showDetail(p.hex));
+        markers.set(p.hex, m);
+      }else{
+        m.setLngLat([p.lon, p.lat]);
+        m.getElement().className = cls;
+      }
+      m.getElement().style.display = shouldShow(p) ? 'block' : 'none';
+    });
+
+    markers.forEach((m,id)=>{ if(!seen.has(id)){ m.remove(); markers.delete(id); planes.delete(id);} });
+    renderList();
+  }catch(e){
+    console.error(e);
+    document.getElementById('apiStatus').textContent = 'RETRYING...';
+    setTimeout(fetchLive, 3000);
+  }
+}
+
+function renderList(){
+  const q = (document.getElementById('search').value||'').toLowerCase();
+  const list = document.getElementById('flightList');
+  let arr = Array.from(planes.values()).filter(shouldShow);
+  if(q){ arr = arr.filter(p=> (p.flight||'').toLowerCase().includes(q) || (p.hex||'').toLowerCase().includes(q)); }
+  arr = arr.slice(0,300);
+  list.innerHTML = arr.map(p=>`
+    <div class="flight ${p.type==='mil'?'mil':''} ${isPIA(p)?'pia':''}" onclick="showDetail('${p.hex}')">
+      <span>${p.type==='mil'?'🔴':isPIA(p)?'🟢':'🔵'} ${p.flight||p.hex}</span>
+      <span style="color:${p.type==='mil'?'#ef4444':'#00d9ff'}">${p.alt_baro||'GND'}</span>
+    </div>
+  `).join('') || 'No planes for filter - click ALL';
+}
+
+window.showDetail = (hex)=>{
+  const p = planes.get(hex); if(!p) return;
+  document.getElementById('detail').classList.add('show');
+  document.getElementById('d_callsign').textContent = p.flight||hex;
+  document.getElementById('d_type').textContent = p.type==='mil'?'🔴 MILITARY': isPIA(p)?'🟢 PIA':'🔵 CIVIL';
+  document.getElementById('d_type').style.color = p.type==='mil'?'#ef4444': isPIA(p)?'#22c55e':'#00d9ff';
+  document.getElementById('d_flight').textContent = p.flight||'-';
+  document.getElementById('d_alt').textContent = (p.alt_baro||0)+' ft';
+  document.getElementById('d_spd').textContent = (p.gs?Math.round(p.gs)+' kts':'-');
+  document.getElementById('d_pos').textContent = p.lat.toFixed(3)+','+p.lon.toFixed(3);
+  map.flyTo({center:[p.lon,p.lat], zoom:5});
+}
+
+document.getElementById('search').addEventListener('input', renderList);
+fetchLive();
+setInterval(fetchLive, 10000);
+</script>
+</body>
+</html>
