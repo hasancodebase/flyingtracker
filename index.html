@@ -27,8 +27,9 @@
   .flight:hover{background:#1a2747} .flight.mil{border-left-color:var(--mil)} .flight.pia{border-left-color:var(--pia)}
   #detail{position:absolute;right:10px;top:66px;width:320px;background:#111a2e;border:1px solid var(--border);border-radius:12px;padding:12px;z-index:5;display:none}
   #detail.show{display:block}
-  .plane{width:10px;height:10px;border-radius:50%;border:1.5px solid #fff;box-shadow:0 0 8px currentColor;cursor:pointer}
-  .plane.mil{background:var(--mil);color:var(--mil)} .plane.civil{background:var(--accent);color:var(--accent)} .plane.pia{background:var(--pia);color:var(--pia);width:13px;height:13px}
+  /* AIRCRAFT ICON - NOT DOT */
+  .plane{width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:22px;cursor:pointer;filter:drop-shadow(0 0 4px currentColor);transition:transform 0.5s}
+  .plane.mil{color:var(--mil)} .plane.civil{color:var(--accent)} .plane.pia{color:var(--pia);font-size:26px;filter:drop-shadow(0 0 6px #22c55e)}
   .legend{position:absolute;bottom:20px;left:380px;z-index:5;background:rgba(17,26,46,0.9);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:11px;display:flex;gap:12px}
 </style>
 </head>
@@ -47,7 +48,7 @@
 <div id="map"></div>
 <div id="sidebar">
   <input id="search" placeholder="Search PIA, RCH, EK..." />
-  <div id="flightList">Loading worldwide...</div>
+  <div id="flightList">Loading worldwide aircrafts...</div>
 </div>
 <div id="detail">
   <div style="display:flex;justify-content:space-between"><b id="d_callsign">-</b><span onclick="document.getElementById('detail').classList.remove('show')" style="cursor:pointer">✕</span></div>
@@ -56,13 +57,14 @@
     Flight: <b id="d_flight">-</b><br>
     Alt: <b id="d_alt">-</b><br>
     Speed: <b id="d_spd">-</b><br>
+    Heading: <b id="d_head">-</b><br>
     Pos: <b id="d_pos">-</b>
   </div>
 </div>
 <div class="legend">
-  <span><span style="display:inline-block;width:8px;height:8px;background:#ef4444;border-radius:50%"></span> Military</span>
-  <span><span style="display:inline-block;width:8px;height:8px;background:#00d9ff;border-radius:50%"></span> Civil</span>
-  <span><span style="display:inline-block;width:10px;height:10px;background:#22c55e;border-radius:50%"></span> PIA</span>
+  <span>✈ Military</span>
+  <span>✈ Civil</span>
+  <span style="color:#22c55e">✈ PIA</span>
 </div>
 <script>
 const map = new maplibregl.Map({
@@ -84,7 +86,7 @@ window.setFilter = (f)=>{
   renderList();
   markers.forEach((m,hex)=>{
     const p = planes.get(hex);
-    m.getElement().style.display = shouldShow(p) ? 'block' : 'none';
+    m.getElement().style.display = shouldShow(p) ? 'flex' : 'none';
   });
 }
 
@@ -104,21 +106,18 @@ async function fetchLive(){
     document.getElementById('apiStatus').textContent = 'LOADING...';
     let all = [];
 
-    // 1. CIVIL WORLDWIDE - OpenSky (fast, CORS ok)
     try{
       const res = await fetch('https://opensky-network.org/api/states/all', {cache:'no-store'});
       const j = await res.json();
       if(j.states){
         j.states.forEach(s=>{
-          // s: [icao24, callsign, origin, time, lastContact, lon, lat, baroAlt, onGround, vel, heading, vertRate, ...]
           if(s[5] && s[6]){
             all.push({hex:s[0], flight:(s[1]||'').trim(), lon:s[5], lat:s[6], alt_baro:Math.round(s[7]||0), gs:s[9], track:s[10], type:'civil'});
           }
         });
       }
-    }catch(e){ console.log('opensky fail', e); }
+    }catch(e){}
 
-    // 2. MILITARY - adsb.lol mil via proxy (small file)
     try{
       const proxy = 'https://api.allorigins.win/raw?url='+encodeURIComponent('https://api.adsb.lol/v2/mil');
       const res = await fetch(proxy, {cache:'no-store'});
@@ -128,16 +127,14 @@ async function fetchLive(){
         if(j.ac){
           j.ac.forEach(p=>{
             if(p.hex && p.lat && p.lon){
-              all.push({hex:p.hex, flight:(p.flight||'').trim(), lon:p.lon, lat:p.lat, alt_baro:p.alt_baro||0, gs:p.gs, track:p.track, type:'mil', mil:true});
+              all.push({hex:p.hex, flight:(p.flight||'').trim(), lon:p.lon, lat:p.lat, alt_baro:p.alt_baro||0, gs:p.gs, track:p.track||p.true_heading, type:'mil', mil:true});
             }
           });
         }
       }
-    }catch(e){ console.log('mil fail', e); }
+    }catch(e){}
 
-    if(all.length===0) throw new Error('no data yet');
-
-    // Deduplicate and sort
+    if(all.length===0) throw new Error('no data');
     const mapByHex = new Map();
     all.forEach(p=> mapByHex.set(p.hex, p));
     let ac = Array.from(mapByHex.values());
@@ -148,11 +145,10 @@ async function fetchLive(){
       if(a.type!=='mil'&&b.type==='mil') return 1;
       return 0;
     });
-    ac = ac.slice(0, 3000);
+    ac = ac.slice(0, 2500);
 
     document.getElementById('planeCount').textContent = mapByHex.size;
-    const milCount = ac.filter(p=>p.type==='mil').length;
-    document.getElementById('apiStatus').textContent = 'LIVE • '+milCount+' MIL';
+    document.getElementById('apiStatus').textContent = 'LIVE • '+ac.filter(p=>p.type==='mil').length+' MIL';
     document.getElementById('apiStatus').style.color = '#22c55e';
 
     const seen = new Set();
@@ -166,6 +162,8 @@ async function fetchLive(){
       else if(p.type==='mil') cls+='mil';
       else cls+='civil';
       el.className = cls;
+      el.textContent = '✈';
+      el.style.transform = `rotate(${(p.track||0)-45}deg)`;
       el.title = p.flight||p.hex;
       if(!m){
         m = new maplibregl.Marker({element: el}).setLngLat([p.lon, p.lat]).addTo(map);
@@ -174,14 +172,15 @@ async function fetchLive(){
       }else{
         m.setLngLat([p.lon, p.lat]);
         m.getElement().className = cls;
+        m.getElement().textContent = '✈';
+        m.getElement().style.transform = `rotate(${(p.track||0)-45}deg)`;
       }
-      m.getElement().style.display = shouldShow(p) ? 'block' : 'none';
+      m.getElement().style.display = shouldShow(p) ? 'flex' : 'none';
     });
 
     markers.forEach((m,id)=>{ if(!seen.has(id)){ m.remove(); markers.delete(id); planes.delete(id);} });
     renderList();
   }catch(e){
-    console.error(e);
     document.getElementById('apiStatus').textContent = 'RETRYING...';
     setTimeout(fetchLive, 3000);
   }
@@ -195,10 +194,10 @@ function renderList(){
   arr = arr.slice(0,300);
   list.innerHTML = arr.map(p=>`
     <div class="flight ${p.type==='mil'?'mil':''} ${isPIA(p)?'pia':''}" onclick="showDetail('${p.hex}')">
-      <span>${p.type==='mil'?'🔴':isPIA(p)?'🟢':'🔵'} ${p.flight||p.hex}</span>
+      <span>✈ ${p.flight||p.hex}</span>
       <span style="color:${p.type==='mil'?'#ef4444':'#00d9ff'}">${p.alt_baro||'GND'}</span>
     </div>
-  `).join('') || 'No planes for filter - click ALL';
+  `).join('') || 'No planes - click ALL';
 }
 
 window.showDetail = (hex)=>{
@@ -210,6 +209,7 @@ window.showDetail = (hex)=>{
   document.getElementById('d_flight').textContent = p.flight||'-';
   document.getElementById('d_alt').textContent = (p.alt_baro||0)+' ft';
   document.getElementById('d_spd').textContent = (p.gs?Math.round(p.gs)+' kts':'-');
+  document.getElementById('d_head').textContent = (p.track?Math.round(p.track)+'°':'-');
   document.getElementById('d_pos').textContent = p.lat.toFixed(3)+','+p.lon.toFixed(3);
   map.flyTo({center:[p.lon,p.lat], zoom:5});
 }
